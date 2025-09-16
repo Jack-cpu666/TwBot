@@ -1,6 +1,9 @@
+# requirements.txt
+
 Flask==2.2.3
 selenium==4.10.0
-gunicorn==20.1.0
+# UPGRADED Gunicorn to a modern version compatible with new Eventlet
+gunicorn==22.0.0
 Werkzeug==2.2.2
 Flask-SocketIO==5.3.6
 eventlet==0.33.3

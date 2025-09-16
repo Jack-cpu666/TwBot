@@ -6,9 +6,6 @@ services:
     runtime: docker
     # Specify the path to your Dockerfile
     dockerfilePath: ./Dockerfile
-    # --- CRUCIAL FOR SOCKETIO ---
-    # Enable sticky sessions in the advanced settings
-    stickySessions: true
     # Set up health checks
     healthCheckPath: /health
     # Define environment variables if needed

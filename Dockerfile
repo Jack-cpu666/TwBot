@@ -19,6 +19,16 @@ RUN apt-get update && apt-get install -y wget gnupg ca-certificates && \
     # Clean up apt lists to keep the image size small
     rm -rf /var/lib/apt/lists/*
 
+# Install matching ChromeDriver
+RUN CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3) && \
+    wget --no-verbose -O /tmp/chromedriver_linux64.zip https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip && \
+    mkdir -p /opt/chromedriver && \
+    unzip /tmp/chromedriver_linux64.zip -d /opt/chromedriver && \
+    mv /opt/chromedriver/chromedriver-linux64/chromedriver /opt/chromedriver/ && \
+    chmod +x /opt/chromedriver/chromedriver && \
+    ln -s /opt/chromedriver/chromedriver /usr/local/bin/chromedriver && \
+    rm /tmp/chromedriver_linux64.zip
+
 # 3. Set the working directory inside the container.
 WORKDIR /app
 

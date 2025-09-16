@@ -1,13 +1,17 @@
 services:
+  # This defines your web service
   - type: web
-    name: your-app-name
-    env: python
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app"  # or whatever starts your app
+    name: shared-browser # You can change this name
+    # Tell Render to use Docker for the environment
+    runtime: docker
+    # Specify the path to your Dockerfile
+    dockerfilePath: ./Dockerfile
+    # --- CRUCIAL FOR SOCKETIO ---
+    # Enable sticky sessions in the advanced settings
+    stickySessions: true
+    # Set up health checks
+    healthCheckPath: /health
+    # Define environment variables if needed
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
-    # Specify system packages here
-    buildPacks:
-      - https://github.com/heroku/heroku-buildpack-google-chrome.git
-      - https://github.com/heroku/heroku-buildpack-chromedriver.git
+        value: 3.11 # This is more for documentation; the Dockerfile sets the version

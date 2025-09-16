@@ -2,4 +2,4 @@ services:
   - type: web
     name: python-web-visitor
     env: docker
-    plan: free
+    plan: Starter

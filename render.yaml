@@ -1,17 +1,5 @@
 services:
-  # A Web Service for our Flask App
   - type: web
     name: python-web-visitor
-    # CHANGE THIS LINE from 'python' to 'buildpack'
-    env: buildpack
-    # The 'free' plan is fine for this example, but may be slow.
+    env: docker
     plan: free
-    # The command to install our python dependencies
-    buildCommand: "pip install -r requirements.txt"
-    # The command to start our Gunicorn web server
-    startCommand: "gunicorn --workers 1 --threads 8 --timeout 0 app:app"
-    # This section will now be correctly recognized
-    buildpacks:
-      - heroku/python
-      - https://github.com/heroku/heroku-buildpack-google-chrome
-      - https://github.com/heroku/heroku-buildpack-chromedriver

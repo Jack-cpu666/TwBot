@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: python-web-visitor
+    env: python
+    plan: free # or your desired plan
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn --workers 1 --threads 8 --timeout 0 app:app"
+    buildpacks:
+      - heroku/python
+      - https://github.com/heroku/heroku-buildpack-google-chrome
+      - https://github.com/heroku/heroku-buildpack-chromedriver

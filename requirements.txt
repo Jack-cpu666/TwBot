@@ -1,9 +1,13 @@
 # requirements.txt
+# FINAL VERSION - Uses the latest libraries to ensure driver compatibility.
 
-Flask==2.2.3
-selenium==4.35.0
-# UPGRADED Gunicorn to a modern version compatible with new Eventlet
-gunicorn==22.0.0
-Werkzeug==2.2.2
-Flask-SocketIO==5.3.6
-eventlet==0.33.3
+Flask>=2.3.0
+# Remove the version pin to get the latest version which supports Chrome 140+
+undetected-chromedriver
+selenium>=4.10.0
+gunicorn>=22.0.0
+Werkzeug>=3.0.0
+Flask-SocketIO>=5.3.6
+eventlet>=0.35.0
+greenlet>=3.0.0
+dnspython>=2.0.0

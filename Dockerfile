@@ -1,16 +1,23 @@
 # Dockerfile
-# This file defines the complete environment for the application.
+# FINAL VERSION - Uses the modern, secure method for adding apt repositories.
 
 # 1. Start from a lean and official Python base image.
 FROM python:3.11-slim
 
-# 2. Install Google Chrome and its dependencies.
-RUN apt-get update && apt-get install -y wget gnupg \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
+# 2. Install Google Chrome using the new, recommended procedure.
+RUN apt-get update && apt-get install -y wget gnupg ca-certificates && \
+    # Create the directory for keyring files
+    mkdir -p /etc/apt/keyrings && \
+    # Download the Google Chrome signing key, de-armor it, and save it to the keyring directory
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg && \
+    # Create the repository source file, telling it to use the key we just saved
+    sh -c 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list' && \
+    # Update apt lists again now that we have the new repository
+    apt-get update && \
+    # Install Google Chrome
+    apt-get install -y google-chrome-stable fonts-liberation && \
+    # Clean up apt lists to keep the image size small
+    rm -rf /var/lib/apt/lists/*
 
 # 3. Set the working directory inside the container.
 WORKDIR /app
@@ -25,7 +32,6 @@ COPY app.py .
 # 6. Let Render set the port.
 ENV PORT 10000
 
-# 7. THIS IS THE CRITICAL START COMMAND.
-# This CMD line is now the definitive command that Render will execute.
+# 7. This is the definitive start command that Render will execute.
 # It correctly uses the eventlet worker required for WebSockets.
 CMD ["gunicorn", "--bind", "0.0.0.0:${PORT}", "--worker-class", "eventlet", "-w", "1", "app:app"]

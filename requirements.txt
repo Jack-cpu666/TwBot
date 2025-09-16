@@ -1,8 +1,9 @@
 # requirements.txt
 
 Flask==2.2.3
+# Use the new undetected-chromedriver
+undetected-chromedriver==3.5.0
 selenium==4.10.0
-# UPGRADED Gunicorn to a modern version compatible with new Eventlet
 gunicorn==22.0.0
 Werkzeug==2.2.2
 Flask-SocketIO==5.3.6

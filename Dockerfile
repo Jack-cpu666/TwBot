@@ -1,5 +1,5 @@
 # Dockerfile
-# FINAL VERSION - Uses the modern, secure method for adding apt repositories.
+# FINAL VERSION - Uses the correct 'shell form' for the CMD instruction.
 
 # 1. Start from a lean and official Python base image.
 FROM python:3.11-slim
@@ -32,6 +32,7 @@ COPY app.py .
 # 6. Let Render set the port.
 ENV PORT 10000
 
-# 7. This is the definitive start command that Render will execute.
-# It correctly uses the eventlet worker required for WebSockets.
-CMD ["gunicorn", "--bind", "0.0.0.0:${PORT}", "--worker-class", "eventlet", "-w", "1", "app:app"]
+# 7. THIS IS THE CRITICAL FIX.
+# We now use the 'shell form' (no brackets/quotes) so that the ${PORT}
+# environment variable is correctly expanded by the shell.
+CMD gunicorn --bind 0.0.0.0:${PORT} --worker-class eventlet -w 1 app:app

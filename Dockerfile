@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y wget gnupg ca-certificates && \
     # Update apt lists again now that we have the new repository
     apt-get update && \
     # Install Google Chrome
-    apt-get install -y google-chrome-stable fonts-liberation && \
+    apt-get install -y google-chrome-stable fonts-liberation unzip && \
     # Clean up apt lists to keep the image size small
     rm -rf /var/lib/apt/lists/*
 

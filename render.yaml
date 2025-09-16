@@ -1,5 +1,6 @@
 services:
   - type: web
     name: python-web-visitor
-    env: docker
-    plan: Starter
+    env: docker # or 'buildpack' depending on your setup
+    plan: starter # or your upgraded plan
+    startCommand: "gunicorn --worker-class eventlet -w 1 app:app" # The corrected line

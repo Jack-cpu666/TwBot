@@ -1,6 +1,26 @@
+# render.yaml
+# This is the definitive configuration file for Render.
+
 services:
   - type: web
     name: python-web-visitor
-    env: docker # or 'buildpack' depending on your setup
-    plan: starter # or your upgraded plan
-    startCommand: "gunicorn --worker-class eventlet -w 1 app:app" # The corrected line
+    
+    # This tells Render to build your application using the Dockerfile
+    # in your repository.
+    env: docker
+    
+    # Set this to the paid plan you upgraded to (e.g., 'starter').
+    plan: starter
+    
+    # This is the most critical fix.
+    # It overrides the default command and tells Gunicorn to use the 'eventlet'
+    # worker, which is required for the real-time WebSocket communication
+    # that powers the interactive browser.
+    startCommand: "gunicorn --bind 0.0.0.0:${PORT} --worker-class eventlet -w 1 app:app"
+    
+    # Optional: Increase the health check timeout.
+    # This gives your service more time to start up, which can be useful
+    # for complex applications.
+    healthCheckPath: /
+    initialDeployHook: |
+      echo "Starting deployment..."

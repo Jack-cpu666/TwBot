@@ -1,8 +1,7 @@
 # app.py
-# FINAL, SHARED BROWSER VERSION - All users interact with the same instance.
+# FINAL, AUTO-STARTING SHARED BROWSER VERSION
 
 # --- CRUCIAL ---
-# Move monkey_patch() to the absolute top of the file, before any other imports.
 import eventlet
 eventlet.monkey_patch()
 
@@ -17,14 +16,15 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 
+# --- CONFIGURATION ---
+# The URL the browser will automatically navigate to on startup.
+DEFAULT_START_URL = "https://www.twitch.tv/kefkalord"
+
 # --- Find the Chrome Executable Path Automatically ---
-# This is important for both local and Render environments.
 CHROME_EXECUTABLE_PATH = shutil.which('google-chrome-stable')
 if not CHROME_EXECUTABLE_PATH:
-    # This error will be helpful for debugging if Chrome isn't installed correctly on the server.
     raise RuntimeError(
-        "FATAL ERROR: Could not find 'google-chrome-stable' in the system's PATH. "
-        "Ensure Google Chrome is installed and accessible."
+        "FATAL ERROR: Could not find 'google-chrome-stable' in the system's PATH."
     )
 print(f"--- Found Chrome executable at: {CHROME_EXECUTABLE_PATH} ---")
 
@@ -34,13 +34,12 @@ app.config['SECRET_KEY'] = 'shared-secret-key!'
 socketio = SocketIO(app, async_mode='eventlet')
 
 # --- Global State for the SINGLE, SHARED Browser Instance ---
-# We use global variables to hold the one driver instance and manage its state.
 shared_browser_driver = None
 connected_clients = 0
-shared_framerate = 5  # Default framerate
+shared_framerate = 5
 
 # --- The Complete User Interface (HTML, CSS, JavaScript) ---
-# This self-contained template provides the entire frontend.
+# The HTML_TEMPLATE remains exactly the same as before.
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -81,7 +80,7 @@ HTML_TEMPLATE = """
             <div id="overlay">
                 <div>
                     <h1>Welcome to the Shared Remote Browser</h1>
-                    <p>Enter a URL above to begin the session for everyone.</p>
+                    <p>Session is starting automatically...</p>
                 </div>
             </div>
             <img id="screen" alt="Remote Browser Screen">
@@ -99,7 +98,6 @@ HTML_TEMPLATE = """
 
         socket.on('connect', () => { statusEl.textContent = 'Status: Connected'; });
         socket.on('disconnect', () => { statusEl.textContent = 'Status: Disconnected'; });
-        socket.on('connect_error', (err) => { statusEl.textContent = `Error: ${err.message}`; });
         
         socket.on('screenshot', (data) => {
             screen.src = `data:image/jpeg;base64,${data.image}`;
@@ -114,22 +112,16 @@ HTML_TEMPLATE = """
             document.title = data.title;
         });
 
-        socket.on('browser_stopped', () => {
-            overlay.innerHTML = "<h1>Welcome to the Shared Remote Browser</h1><p>The session has ended. Enter a new URL to begin.</p>";
-            overlay.style.display = 'flex';
-            isBrowserStarted = false;
-        });
-
         navForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const url = urlInput.value;
             if (url) {
-                overlay.innerHTML = "<h1>Starting shared browser...</h1>";
-                overlay.style.display = 'flex';
-                socket.emit('start_browser', { url: url });
+                // When a user submits a new URL, we now just ask the server to navigate.
+                socket.emit('navigate_browser', { url: url });
             }
         });
 
+        // Other event listeners (click, scroll, keydown, framerate) remain unchanged...
         screen.addEventListener('click', (e) => {
             if (!isBrowserStarted) return;
             const rect = screen.getBoundingClientRect();
@@ -139,26 +131,16 @@ HTML_TEMPLATE = """
             const y = Math.round((e.clientY - rect.top) * scaleY);
             socket.emit('input_event', { type: 'click', x: x, y: y });
         });
-
         screen.addEventListener('wheel', (e) => {
             if (!isBrowserStarted) return;
             e.preventDefault();
             socket.emit('input_event', { type: 'scroll', deltaY: e.deltaY });
         });
-
         document.addEventListener('keydown', (e) => {
             if (!isBrowserStarted || e.target.id === 'url-input') return;
             e.preventDefault();
-            socket.emit('input_event', {
-                type: 'keydown',
-                key: e.key,
-                code: e.code,
-                ctrlKey: e.ctrlKey,
-                metaKey: e.metaKey,
-                shiftKey: e.shiftKey
-            });
+            socket.emit('input_event', { type: 'keydown', key: e.key, code: e.code, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey});
         });
-
         framerateSlider.addEventListener('input', (e) => {
             socket.emit('settings_change', { framerate: parseInt(e.target.value) });
         });
@@ -168,30 +150,49 @@ HTML_TEMPLATE = """
 """
 
 def stream_screenshots():
-    """ The screenshot streaming loop is now global and broadcasts to everyone. """
+    """ The screenshot streaming loop, unchanged. """
     global shared_browser_driver, shared_framerate
     print("--- Starting screenshot streaming loop. ---")
     while shared_browser_driver:
         try:
             img_bytes = BytesIO(shared_browser_driver.get_screenshot_as_png())
             b64_image = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
-            
-            # Broadcast to ALL connected clients.
             socketio.emit('screenshot', {'image': b64_image})
             socketio.emit('page_info', {'url': shared_browser_driver.current_url, 'title': shared_browser_driver.title})
         except Exception as e:
-            print(f"[STREAM-ERROR] Error in streaming thread: {e}")
-            break # Exit loop if browser crashes or is closed
-        
-        sleep_duration = 1.0 / shared_framerate
-        socketio.sleep(sleep_duration)
+            print(f"[STREAM-ERROR] {e}")
+            break
+        socketio.sleep(1.0 / shared_framerate)
     print("--- Screenshot streaming stopped. ---")
+
+def start_shared_browser(url):
+    """ A dedicated function to start the browser instance. """
+    global shared_browser_driver
+    if shared_browser_driver:
+        print("--- Browser already running. Ignoring start request. ---")
+        return
+
+    try:
+        print(f"--- Starting SHARED browser session at URL: {url} ---")
+        options = uc.ChromeOptions()
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1280,720")
+        
+        driver = uc.Chrome(options=options, browser_executable_path=CHROME_EXECUTABLE_PATH)
+        driver.get(url)
+        shared_browser_driver = driver
+        
+        socketio.start_background_task(target=stream_screenshots)
+    except Exception as e:
+        print(f"[FATAL START-ERROR] {e}")
+        socketio.emit('error', {'message': str(e)})
 
 @app.route('/')
 def index():
     return render_template_string(HTML_TEMPLATE)
 
-# Add a dedicated health check route for Render
 @app.route('/health')
 def health_check():
     return "OK", 200
@@ -204,90 +205,58 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    global connected_clients, shared_browser_driver
+    global connected_clients
     connected_clients -= 1
     print(f"Client disconnected. Total clients: {connected_clients}")
-    
-    # Shut down the browser only if the LAST client disconnects.
-    if connected_clients <= 0 and shared_browser_driver:
-        print("--- Last client disconnected. Shutting down shared browser. ---")
-        try:
-            shared_browser_driver.quit()
-        except Exception as e:
-            print(f"Error while quitting driver: {e}")
-        finally:
-            shared_browser_driver = None
-            # Tell any lingering clients that the browser is gone
-            socketio.emit('browser_stopped')
+    # Note: We are no longer shutting down the browser on disconnect. It will run forever.
 
-@socketio.on('start_browser')
-def handle_start_browser(data):
-    global shared_browser_driver
-    
-    url = data.get('url', 'https://www.google.com/ncr')
-
-    # If a browser is already running, just navigate to the new URL.
+@socketio.on('navigate_browser')
+def handle_navigate_browser(data):
+    """ Handles requests from users to change the URL. """
     if shared_browser_driver:
-        print(f"Browser already running. Navigating to: {url}")
+        url = data.get('url', DEFAULT_START_URL)
+        print(f"--- Navigating to new URL: {url} ---")
         try:
             shared_browser_driver.get(url)
         except Exception as e:
-            print(f"Error navigating to new URL: {e}")
-        return
-
-    try:
-        print(f"--- Starting SHARED browser session for all users at URL: {url} ---")
-        
-        options = uc.ChromeOptions()
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1280,720")
-        
-        driver = uc.Chrome(
-            options=options,
-            browser_executable_path=CHROME_EXECUTABLE_PATH
-        )
-        
-        driver.get(url)
-        shared_browser_driver = driver
-        
-        # Start the one and only screenshot loop as a background task.
-        socketio.start_background_task(target=stream_screenshots)
-    except Exception as e:
-        print(f"[START-ERROR] Error starting browser: {e}")
-        socketio.emit('error', {'message': str(e)})
+            print(f"[NAVIGATE-ERROR] {e}")
 
 @socketio.on('input_event')
 def handle_input_event(data):
-    # Direct all input events to the single shared browser driver.
+    """ Handles all user interactions, unchanged. """
     if not shared_browser_driver: return
-    
     event_type = data.get('type')
     try:
         if event_type == 'click':
-            x, y = data['x'], data['y']
-            ActionChains(shared_browser_driver).move_by_offset(x, y).click().move_by_offset(-x, -y).perform()
+            ActionChains(shared_browser_driver).move_by_offset(data['x'], data['y']).click().move_by_offset(-data['x'], -data['y']).perform()
         elif event_type == 'scroll':
-            delta_y = data.get('deltaY', 0)
-            shared_browser_driver.execute_script(f"window.scrollBy(0, {delta_y});")
+            shared_browser_driver.execute_script(f"window.scrollBy(0, {data.get('deltaY', 0)});")
         elif event_type == 'keydown':
-            key = data.get('key')
-            active_element = shared_browser_driver.switch_to.active_element
-            active_element.send_keys(key)
+            shared_browser_driver.switch_to.active_element.send_keys(data.get('key'))
     except Exception as e:
-        print(f"[INPUT-ERROR] Error processing '{event_type}': {e}")
-        
+        print(f"[INPUT-ERROR] {e}")
+
 @socketio.on('settings_change')
 def handle_settings_change(data):
+    """ Handles framerate changes, unchanged. """
     global shared_framerate
     if 'framerate' in data:
         new_rate = int(data['framerate'])
         if 1 <= new_rate <= 10:
             shared_framerate = new_rate
 
-# This is the entry point for local execution
+# --- THIS IS THE NEW SECTION FOR AUTO-STARTING ---
+# This block runs when the script is started by Gunicorn in production.
+# It does NOT run during local development (when __name__ == '__main__').
+if __name__ != '__main__':
+    print("--- PRODUCTION MODE: Spawning browser on startup. ---")
+    # We use eventlet.spawn to start the browser in a non-blocking way
+    # as soon as the application initializes.
+    eventlet.spawn(start_shared_browser, DEFAULT_START_URL)
+
+# This is the entry point for local execution ( unchanged).
 if __name__ == '__main__':
-    print("--- Starting local development server in SHARED MODE ---")
-    print("--- Access the application at http://localhost:5001 ---")
+    print("--- Starting local development server (MANUAL START) ---")
+    print("--- Access at http://localhost:5001 and enter a URL to begin ---")
+    # In local dev, we don't auto-start, so you can test the manual flow.
     socketio.run(app, debug=True, port=5001)

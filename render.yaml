@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: your-app-name
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app"  # or whatever starts your app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+    # Specify system packages here
+    buildPacks:
+      - https://github.com/heroku/heroku-buildpack-google-chrome.git
+      - https://github.com/heroku/heroku-buildpack-chromedriver.git

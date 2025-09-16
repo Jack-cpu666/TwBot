@@ -5,22 +5,14 @@ services:
   - type: web
     name: python-web-visitor
     
-    # This tells Render to build your application using the Dockerfile
-    # in your repository.
+    # This tells Render to build your application using the Dockerfile.
     env: docker
     
     # Set this to the paid plan you upgraded to (e.g., 'starter').
     plan: starter
     
-    # This is the most critical fix.
-    # It overrides the default command and tells Gunicorn to use the 'eventlet'
-    # worker, which is required for the real-time WebSocket communication
-    # that powers the interactive browser.
-    startCommand: "gunicorn --bind 0.0.0.0:${PORT} --worker-class eventlet -w 1 app:app"
+    # The 'startCommand' has been removed, as it is not allowed with 'env: docker'.
+    # Render will now use the CMD instruction from the Dockerfile.
     
     # Optional: Increase the health check timeout.
-    # This gives your service more time to start up, which can be useful
-    # for complex applications.
     healthCheckPath: /
-    initialDeployHook: |
-      echo "Starting deployment..."
